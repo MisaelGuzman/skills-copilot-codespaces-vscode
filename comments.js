@@ -1,82 +1,81 @@
 // create web server
-const http = require('http');
-const fs = require('fs');
-const url = require('url');
-const querystring = require('querystring');
-const template = require('./template.js');
-const path = require('path');
-const sanitizeHtml = require('sanitize-html');
-const mysql = require('mysql');
+// create a new comment
+// get all comments
+// get a comment
+// update a comment
+// delete a comment
 
-// create connection pool
-const db = mysql.createPool({
-    host: 'localhost',
-    user: 'root',
-    password: '111111',
-    database: 'opentutorials'
+const express = require('express');
+const router = express.Router();
+const Comment = require('../models/comment');
+
+// create a new comment
+router.post('/', async (req, res) => {
+    const comment = new Comment({
+        comment: req.body.comment,
+        commenter: req.body.commenter
+    });
+
+    try {
+        const newComment = await comment.save();
+        res.status(201).json(newComment);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
 });
 
-const app = http.createServer(function(request, response) {
-    const _url = request.url;
-    const queryData = url.parse(_url, true).query;
-    const pathname = url.parse(_url, true).pathname;
+// get all comments
+router.get('/', async (req, res) => {
+    try {
+        const comments = await Comment.find();
+        res.json(comments);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
 
-    if (pathname === '/') {
-        if (queryData.id === undefined) {
-            db.query(`SELECT * FROM topic`, function(error, topics) {
-                const title = 'Welcome';
-                const description = 'Hello, Node.js';
-                const list = template.list(topics);
-                const html = template.HTML(title, list,
-                    `<h2>${title}</h2>${description}`,
-                    `<a href="/create">create</a>`
-                );
-                response.writeHead(200);
-                response.end(html);
-            });
-        } else {
-            db.query(`SELECT * FROM topic`, function(error, topics) {
-                if (error) {
-                    throw error;
-                });
-            }
-        });
-                db.query(`SELECT * FROM topic WHERE id=?`, [queryData.id], function(error2, topic) {
-                    if (error2) {
-                        throw error2;
-                    }
-                    const title = topic[0].title;
-                    const description = topic[0].description;
-                    const list = template.list(topics);
-                    const html = template.HTML(title, list,
-                        `<h2>${title}</h2>${description}`,
-                        `<a href="/create">create</a>
-                        <a href="/update?id=${queryData.id}">update</a>
-                        <form action="/delete_process" method="post">
-                            <input type="hidden" name="id" value="${queryData.id}">
-                            <input type="submit" value="delete">
-                        </form>`
-                    );
-                    response.writeHead(200);
-                    response.end(html);
-                });
-            });
+// get a comment
+router.get('/:id', getComment, (req, res) => {
+    res.json(res.comment);
+});
+
+// update a comment
+router.patch('/:id', getComment, async (req, res) => {
+    if (req.body.comment != null) {
+        res.comment.comment = req.body.comment;
+    }
+
+    try {
+        const updatedComment = await res.comment.save();
+        res.json(updatedComment);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// delete a comment
+router.delete('/:id', getComment, async (req, res) => {
+    try {
+        await res.comment.remove();
+        res.json({ message: 'Deleted comment' });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+async function getComment(req, res, next) {
+    let comment;
+    try {
+        comment = await Comment.findById(req.params.id);
+        if (comment == null) {
+            return res.status(404).json({ message: 'Cannot find comment' });
         }
-    } else if (pathname === '/create') {
-        db.query(`SELECT * FROM topic`, function(error, topics) {
-            const title = 'Create';
-            const list = template.list(topics);
-            const html = template.HTML(title, list, `
-                <form action="/create_process" method="post">
-                    <p><input type="text" name="title" placeholder="title"></p>
-                    <p>
-                        <textarea name="description" placeholder="description"></textarea>
-                    </p>
-                    <p>
-                        <input type="submit">
-                    </p>
-                </form>
-            `, '');
-            response.writeHead(200);
-            response.end(html);
-        }
+    } catch (err) {
+        return res.status(500).json({ message: err.message });
+    }
+
+    res.comment = comment;
+    next();
+}
+
+module.exports = router;
