@@ -1,81 +1,50 @@
 // create web server
-// create a new comment
-// get all comments
-// get a comment
-// update a comment
-// delete a comment
-
-const express = require('express');
-const router = express.Router();
-const Comment = require('../models/comment');
-
-// create a new comment
-router.post('/', async (req, res) => {
-    const comment = new Comment({
-        comment: req.body.comment,
-        commenter: req.body.commenter
-    });
-
-    try {
-        const newComment = await comment.save();
-        res.status(201).json(newComment);
-    } catch (err) {
-        res.status(400).json({ message: err.message });
+var http = require('http');
+var fs = require('fs');
+var path = require('path');
+var url = require('url');
+var comments = [];
+var server = http.createServer(function (req, res) {
+    var parseObj = url.parse(req.url, true);
+    var pathname = parseObj.pathname;
+    if (pathname === '/') {
+        fs.readFile('./views/index.html', function (err, data) {
+            if (err) {
+                return res.end('404 Not Found');
+            }
+            res.end(data);
+        });
+    } else if (pathname === '/post') {
+        fs.readFile('./views/post.html', function (err, data) {
+            if (err) {
+                return res.end('404 Not Found');
+            }
+            res.end(data);
+        });
+    } else if (pathname.indexOf('/public/') === 0) {
+        fs.readFile('.' + pathname, function (err, data) {
+            if (err) {
+                return res.end('404 Not Found');
+            }
+            res.end(data);
+        });
+    } else if (pathname === '/comments') {
+        var comment = parseObj.query;
+        comment.dateTime = new Date();
+        comments.push(comment);
+        res.statusCode = 302;
+        res.setHeader('Location', '/');
+        res.end();
+    } else {
+        fs.readFile('./views/404.html', function (err, data) {
+            if (err) {
+                return res.end('404 Not Found');
+            }
+            res.end(data);
+        });
     }
 });
-
-// get all comments
-router.get('/', async (req, res) => {
-    try {
-        const comments = await Comment.find();
-        res.json(comments);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
+// listen port
+server.listen(3000, function () {
+    console.log('Server is running...');
 });
-
-// get a comment
-router.get('/:id', getComment, (req, res) => {
-    res.json(res.comment);
-});
-
-// update a comment
-router.patch('/:id', getComment, async (req, res) => {
-    if (req.body.comment != null) {
-        res.comment.comment = req.body.comment;
-    }
-
-    try {
-        const updatedComment = await res.comment.save();
-        res.json(updatedComment);
-    } catch (err) {
-        res.status(400).json({ message: err.message });
-    }
-});
-
-// delete a comment
-router.delete('/:id', getComment, async (req, res) => {
-    try {
-        await res.comment.remove();
-        res.json({ message: 'Deleted comment' });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
-
-async function getComment(req, res, next) {
-    let comment;
-    try {
-        comment = await Comment.findById(req.params.id);
-        if (comment == null) {
-            return res.status(404).json({ message: 'Cannot find comment' });
-        }
-    } catch (err) {
-        return res.status(500).json({ message: err.message });
-    }
-
-    res.comment = comment;
-    next();
-}
-
-module.exports = router;
