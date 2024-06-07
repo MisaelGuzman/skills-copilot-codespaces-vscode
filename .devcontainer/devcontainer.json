@@ -1,0 +1,11 @@
+{
+    // Name this configuration
+    "name": "Codespace for Skills MisaDev!",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "GitHub.copilot"
+            ]
+        }
+    }
+}
